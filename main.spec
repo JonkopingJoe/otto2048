@@ -11,6 +11,7 @@ a = Analysis(
     pathex=[BASE_DIR],
     binaries=[],
     datas=[
+        (os.path.join(BASE_DIR, 'pics'), 'pics'),
         (os.path.join(BASE_DIR, 'sound'), 'sound'),
         (os.path.join(BASE_DIR, 'NotoSansCJK-Regular.ttc'), '.'),
     ],

@@ -40,9 +40,7 @@ BLOCK_INFO = {
     512: {"text": "哈比下", "sound": "哈比下.mp3"}, 
     1024: {"text": "哈里路大旋风", "sound": "哈里路大旋风.mp3"}, 
     2048: {"text": "哇哦", "sound": "哇哦.mp3"},
-
 }
-
 
 def draw_grid(window):
     for row in range(1, ROWS):
@@ -95,8 +93,6 @@ class Tile:
              self.y + (RECT_HEIGHT / 2 - text.get_height() / 2))
         )
 
-
-
     def set_pos(self, ceil = False):
         if ceil:
             self.row = math.ceil(self.y / RECT_HEIGHT)
@@ -143,12 +139,11 @@ def tiles_changed(before, after):
 
 def move_tiles(window, tiles, clock, direction):
     updated = True
-    blocks = set()
     merged_values = []
 
-    # 记录原始状态以检测是否有变化
     tiles_before = {k: Tile(t.value, t.row, t.col) for k, t in tiles.items()}
 
+    # 设置方向参数
     if direction == "left":
         sort_func = lambda x: x.col
         reverse = False
@@ -156,9 +151,7 @@ def move_tiles(window, tiles, clock, direction):
         boundary_check = lambda tile: tile.col == 0
         get_next_tile = lambda tile: tiles.get(f"{tile.row}{tile.col-1}")
         merge_check = lambda tile, next_tile: tile.x > next_tile.x + MOVE_VEL
-        move_check = (
-            lambda tile, next_tile: tile.x > next_tile.x + RECT_WIDTH + MOVE_VEL
-        )
+        move_check = lambda tile, next_tile: tile.x > next_tile.x + RECT_WIDTH + MOVE_VEL
         ceil = True
     elif direction == "right":
         sort_func = lambda x: x.col
@@ -167,9 +160,7 @@ def move_tiles(window, tiles, clock, direction):
         boundary_check = lambda tile: tile.col == COLS - 1
         get_next_tile = lambda tile: tiles.get(f"{tile.row}{tile.col+1}")
         merge_check = lambda tile, next_tile: tile.x < next_tile.x - MOVE_VEL
-        move_check = (
-            lambda tile, next_tile: tile.x + RECT_WIDTH + MOVE_VEL < next_tile.x
-        )
+        move_check = lambda tile, next_tile: tile.x + RECT_WIDTH + MOVE_VEL < next_tile.x
         ceil = False
     elif direction == "up":
         sort_func = lambda x: x.row
@@ -178,9 +169,7 @@ def move_tiles(window, tiles, clock, direction):
         boundary_check = lambda tile: tile.row == 0
         get_next_tile = lambda tile: tiles.get(f"{tile.row-1}{tile.col}")
         merge_check = lambda tile, next_tile: tile.y > next_tile.y + MOVE_VEL
-        move_check = (
-            lambda tile, next_tile: tile.y > next_tile.y + RECT_WIDTH + MOVE_VEL
-        )
+        move_check = lambda tile, next_tile: tile.y > next_tile.y + RECT_WIDTH + MOVE_VEL
         ceil = True
     elif direction == "down":
         sort_func = lambda x: x.row
@@ -189,45 +178,47 @@ def move_tiles(window, tiles, clock, direction):
         boundary_check = lambda tile: tile.row == ROWS - 1
         get_next_tile = lambda tile: tiles.get(f"{tile.row+1}{tile.col}")
         merge_check = lambda tile, next_tile: tile.y < next_tile.y - MOVE_VEL
-        move_check = (
-            lambda tile, next_tile: tile.y + RECT_WIDTH + MOVE_VEL < next_tile.y
-        )
+        move_check = lambda tile, next_tile: tile.y + RECT_WIDTH + MOVE_VEL < next_tile.y
         ceil = False
+
+    merged_keys = set()
 
     while updated:
         clock.tick(FPS)
         updated = False
         sorted_tiles = sorted(tiles.values(), key=sort_func, reverse=reverse)
 
-        for i, tile in enumerate(sorted_tiles):
+        for tile in sorted_tiles:
             if boundary_check(tile):
                 continue
 
             next_tile = get_next_tile(tile)
-
             if not next_tile:
                 tile.move(delta)
-            elif tile.value == next_tile.value and tile not in blocks and next_tile not in blocks:
+                updated = True
+            elif (
+                tile.value == next_tile.value and
+                f"{tile.row}{tile.col}" not in merged_keys and
+                f"{next_tile.row}{next_tile.col}" not in merged_keys
+            ):
                 if merge_check(tile, next_tile):
                     tile.move(delta)
+                    updated = True
                 else:
                     next_tile.value *= 2
-                    blocks.add(tile)
-                    blocks.add(next_tile)
+                    merged_keys.add(f"{tile.row}{tile.col}")
+                    merged_keys.add(f"{next_tile.row}{next_tile.col}")
                     merged_values.append(next_tile.value)
-                    sorted_tiles.pop(i)
-                    i -= 1  # ✅ 新增行：合并后回退索引，防止跳过下一个 tile
+                    sorted_tiles.remove(tile)
+                    updated = True
             elif move_check(tile, next_tile):
                 tile.move(delta)
-            else:
-                continue
+                updated = True
 
             tile.set_pos(ceil)
-            updated = True
 
         update_tiles(window, tiles, sorted_tiles)
 
-    # 若无实际变化，不添加新方块也不播放音效
     if not tiles_changed(tiles_before, tiles):
         return "no change"
 
@@ -241,9 +232,7 @@ def move_tiles(window, tiles, clock, direction):
         if os.path.isfile(sound_path):
             pygame.mixer.Sound(sound_path).play()
 
-
     return "continue"
-
 
 def start_screen(window):
     background_path = os.path.join(BASE_DIR, "pics", "start_bg.jpg")  # 更换为你的背景图名
@@ -313,7 +302,6 @@ def game_over_screen(window):
                 pygame.mixer.music.stop()
                 waiting = False
 
-
 def can_move(tiles):
     for row in range(ROWS):
         for col in range(COLS):
@@ -330,7 +318,6 @@ def can_move(tiles):
                         return True  # 可合并
     return False
 
-
 def end_move(tiles):
     if len(tiles) == 16:
         return None
@@ -340,7 +327,6 @@ def end_move(tiles):
     tiles[f"{row}{col}"] = Tile(new_value, row, col)
 
     return new_value
-
 
 def update_tiles(window, tiles, sorted_tiles):
     tiles.clear()
@@ -362,11 +348,52 @@ def generate_tiles():
     #     tiles[f"{row}{col}"] = Tile(16, row, col)  # 16 = "all in"
     # return tiles
 
+def check_win(tiles):
+    for tile in tiles.values():
+        if tile.value == 2048:
+            return True
+    return False
+
+def win_screen(window):
+    pygame.mixer.music.stop()
+
+    surface_copy = window.copy()
+    surface_scaled = pygame.transform.smoothscale(surface_copy, (WIDTH // 2, HEIGHT // 2))
+    blur_surface = pygame.transform.smoothscale(surface_scaled, (WIDTH, HEIGHT))
+    window.blit(blur_surface, (0, 0))
+
+    win_music_path = os.path.join(BASE_DIR, "sound", "win.mp3")  # 可替换为你自己的音效
+    if os.path.isfile(win_music_path):
+        pygame.mixer.music.load(win_music_path)
+        pygame.mixer.music.play(-1)
+
+    font1 = pygame.font.Font(os.path.join(BASE_DIR, "NotoSansCJK-Regular.ttc"), 64)
+    font2 = pygame.font.Font(os.path.join(BASE_DIR, "NotoSansCJK-Regular.ttc"), 32)
+
+    text1 = font1.render("赢了！难道你是职业选手?", True, (255, 215, 0))  # 金黄色
+    text2 = font2.render("按空格返回首页", True, (255, 255, 255))
+
+    text1_rect = text1.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 40))
+    text2_rect = text2.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40))
+
+    waiting = True
+    while waiting:
+        window.blit(text1, text1_rect)
+        window.blit(text2, text2_rect)
+        pygame.display.update()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                pygame.mixer.music.stop()
+                waiting = False
+
 
 def main(window):
     clock = pygame.time.Clock()
     run = True
-
 
     start_screen(window) #显示启动界面
 
@@ -392,14 +419,17 @@ def main(window):
 
         draw(window, tiles)
 
+        if check_win(tiles):
+            win_screen(window)
+            tiles = generate_tiles()
+            start_screen(window)
+
         if not can_move(tiles):
             game_over_screen(window)
             tiles = generate_tiles()
             start_screen(window)
     
     pygame.quit()
-
-
 
 if __name__ == "__main__":
     main(WINDOW)
